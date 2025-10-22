@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Violation Reporting System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .blink {
+            animation: blinker 1.5s linear infinite;
+        }
+        @keyframes blinker {
+            50% {
+                opacity: 0.5;
+            }
+        }
+        .violation-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .drag-container {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 25px;
+            background-color: #f9fafb;
+        }
+        .drag-container.active {
+            border-color: #4f46e5;
+            background-color: #e0e7ff;
+        }
+        .faq-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .faq-content.active {
+            max-height: 500px;
+        }
+        .faq-button.active svg {
+            transform: rotate(180deg);
+        }
+        /* Police Dashboard Specific Styles */
+        .dashboard-card {
+            transition: all 0.3s ease;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-pending {
+            background-color: #FEF3C7;
+            color: #92400E;
+        }
+        .status-approved {
+            background-color: #D1FAE5;
+            color: #065F46;
+        }
+        .status-rejected {
+            background-color: #FEE2E2;
+            color: #B91C1C;
+        }
+        .status-paid {
+            background-color: #E0E7FF;
+            color: #3730A3;
+        }
+        .table-row-hover:hover {
+            background-color: #F9FAFB;
+        }
+        /* Notification styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease-out;
+        }
+        .notification.show {
+            transform: translateX(0);
+        }
+        .notification.success {
+            background-color: #10B981;
+        }
+        .notification.error {
+            background-color: #EF4444;
+        }
+        .notification.info {
+            background-color: #3B82F6;
+        }
+        /* Photo gallery styles */
+        .photo-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .photo-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .photo-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+        .photo-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(239, 68, 68, 0.8);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .photo-item .remove-btn:hover {
+            background-color: rgba(239, 68, 68, 1);
+        }
+        .location-input-container {
+            position: relative;
+        }
+        .location-input-container .location-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6B7280;
+        }
+        .location-input-container input {
+            padding-left: 35px;
+        }
+        .map-container {
+            height: 300px;
+            background-color: #f3f4f6;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 10px;
+        }
+        .map-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #e5e7eb;
+        }
+        .gps-coordinates {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
+        /* Evidence photo styles for dashboard */
+        .evidence-thumbnail {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .evidence-thumbnail:hover {
+            transform: scale(1.05);
+        }
+        .evidence-gallery {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .photo-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            cursor: pointer;
+        }
+        .photo-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .photo-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .photo-modal-close:hover {
+            color: #bbb;
+        }
+        
+        /* Hazard Map Styles */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        .hazard-marker {
+            transition: all 0.3s ease;
+        }
+        
+        .hazard-marker:hover {
+            transform: scale(1.2);
+            z-index: 10;
+        }
+        
+        .severity-critical {
+            animation: pulse 1s infinite;
+        }
+        
+        .severity-high {
+            animation: pulse 2s infinite;
+        }
+        
+        .heatmap-overlay {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        
+        .live-indicator {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Floating Hazard Map Button */
+        .floating-hazard-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 40;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .floating-hazard-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+        }
+        
+        .floating-hazard-btn i {
+            font-size: 24px;
+        }
+        
+        .hazard-map-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.9);
+            color: #374151;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+        }
+        
+        .hazard-map-close:hover {
+            background: white;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+    
+    <!-- Main Navigation -->
+    <nav class="bg-blue-900 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <img src="https://www.pngkey.com/png/full/787-7876688_ezinehydcitypolice-hyd-city-police-logo.png" alt="Traffic Police Department badge" class="h-12 w-14 mr-3">
+                    <span class="text-xl font-semibold">CIVIC PATROL</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#user-interface" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800">Report Violation</a>
+                    <a href="#" onclick="toggleHazardMap()" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 flex items-center">
+                        <i class="fas fa-map-marked-alt mr-1"></i> Hazard Map
+                    </a>
+                    <a href="#" id="police-login-btn" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800">Police Login</a>
+                    <a href="#faqs" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800">FAQs</a>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="p-2 rounded-md">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="md:hidden bg-blue-800">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#user-interface" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">Report Violation</a>
+                <a href="#" onclick="toggleHazardMap()" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">Hazard Map</a>
+                <a href="#" id="mobile-police-login-btn" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">Police Login</a>
+                <a href="#faqs" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700">FAQs</a>
+            </div>
+        </div>
+    </nav>
+    <!-- Hero Section -->
+    <div class="relative">
+        <div class="absolute inset-0 bg-gradient-to-b from-blue-900 to-transparent opacity-50"></div>
+        <img src="https://etimg.etb2bimg.com/photo/74378200.cms" alt="Busy city intersection" class="w-full h-96 object-cover">
+        <div class="absolute inset-0 flex flex-col justify-center items-center text-center px-4">
+            <h1 class="text-4xl md:text-5xl font-bold text-white">Make Our Roads Safer</h1>
+            <p class="mt-4 text-xl text-white">Report traffic violations and road hazards with photo evidence</p>
+            <div class="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="#user-interface" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">Report Violation</a>
+                <button onclick="toggleHazardMap()" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">View Hazard Report</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Real-time Traffic Hazard Map Section (Hidden by default) -->
+    <section id="hazard-map" class="py-12 bg-gray-50 hidden">
+        <div class="hazard-map-close" onclick="toggleHazardMap()">
+            <i class="fas fa-times"></i>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">Live Safety Map</h2>
+                <p class="mt-4 text-lg text-gray-600">Report and view real-time road hazards in your area. Help keep our roads safe for everyone!</p>
+            </div>
+
+            <!-- Quick Report Buttons -->
+            <div class="mb-6">
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Hazard Report</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                        <button onclick="reportHazard('pothole')" class="group relative p-3 bg-gradient-to-br from-red-50 to-red-100 rounded-lg text-center hover:from-red-100 hover:to-red-200 transition-all hover:scale-105">
+                            <i class="fas fa-exclamation-triangle text-red-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Pothole</p>
+                            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="pothole-count">3</span>
+                        </button>
+                        <button onclick="reportHazard('accident')" class="group relative p-3 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg text-center hover:from-orange-100 hover:to-orange-200 transition-all hover:scale-105">
+                            <i class="fas fa-car-crash text-orange-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Accident</p>
+                            <span class="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="accident-count">1</span>
+                        </button>
+                        <button onclick="reportHazard('waterlogging')" class="group relative p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg text-center hover:from-blue-100 hover:to-blue-200 transition-all hover:scale-105">
+                            <i class="fas fa-water text-blue-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Waterlogging</p>
+                            <span class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="water-count">2</span>
+                        </button>
+                        <button onclick="reportHazard('debris')" class="group relative p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg text-center hover:from-yellow-100 hover:to-yellow-200 transition-all hover:scale-105">
+                            <i class="fas fa-road text-yellow-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Debris</p>
+                            <span class="absolute -top-1 -right-1 bg-yellow-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="debris-count">4</span>
+                        </button>
+                        <button onclick="reportHazard('streetlight')" class="group relative p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg text-center hover:from-purple-100 hover:to-purple-200 transition-all hover:scale-105">
+                            <i class="fas fa-lightbulb text-purple-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Street Light</p>
+                            <span class="absolute -top-1 -right-1 bg-purple-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="light-count">0</span>
+                        </button>
+                        <button onclick="reportHazard('tree')" class="group relative p-3 bg-gradient-to-br from-green-50 to-green-100 rounded-lg text-center hover:from-green-100 hover:to-green-200 transition-all hover:scale-105">
+                            <i class="fas fa-tree text-green-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Fallen Tree</p>
+                            <span class="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="tree-count">1</span>
+                        </button>
+                        <button onclick="reportHazard('animal')" class="group relative p-3 bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg text-center hover:from-amber-100 hover:to-amber-200 transition-all hover:scale-105">
+                            <i class="fas fa-paw text-amber-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Animal</p>
+                            <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" id="animal-count">0</span>
+                        </button>
+                        <button onclick="reportHazard('other')" class="group relative p-3 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg text-center hover:from-gray-100 hover:to-gray-200 transition-all hover:scale-105">
+                            <i class="fas fa-ellipsis-h text-gray-600 text-2xl mb-1"></i>
+                            <p class="text-xs font-medium text-gray-700">Other</p>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Hazard Reports -->
+            <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-clock text-blue-600 mr-2"></i>
+                        Recent Reports
+                    </h3>
+                    <div class="space-y-3" id="recent-reports">
+                        <div class="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
+                            <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                                <i class="fas fa-exclamation-triangle text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">Large Pothole on Main Street</p>
+                                <p class="text-xs text-gray-500">Reported 5 min ago • Near City Mall</p>
+                                <div class="flex items-center mt-1 text-xs text-gray-600">
+                                    <i class="fas fa-user mr-1"></i>
+                                    <span>Anonymous</span>
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-thumbs-up mr-1"></i>
+                                    <span>3 verified</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3 p-3 bg-orange-50 rounded-lg">
+                            <div class="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                                <i class="fas fa-car-crash text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">Minor Accident at Highway Junction</p>
+                                <p class="text-xs text-gray-500">Reported 15 min ago • NH-48 Exit 12</p>
+                                <div class="flex items-center mt-1 text-xs text-gray-600">
+                                    <i class="fas fa-user mr-1"></i>
+                                    <span>Rahul K.</span>
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-thumbs-up mr-1"></i>
+                                    <span>5 verified</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
+                            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                                <i class="fas fa-water text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">Waterlogging on Service Road</p>
+                                <p class="text-xs text-gray-500">Reported 30 min ago • Sector 15</p>
+                                <div class="flex items-center mt-1 text-xs text-gray-600">
+                                    <i class="fas fa-user mr-1"></i>
+                                    <span>Priya S.</span>
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-thumbs-up mr-1"></i>
+                                    <span>2 verified</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-chart-line text-green-600 mr-2"></i>
+                        Hazard Statistics
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Potholes</span>
+                                <span class="font-medium">35%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-red-500 h-2 rounded-full" style="width: 35%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Waterlogging</span>
+                                <span class="font-medium">25%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Accidents</span>
+                                <span class="font-medium">15%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-orange-500 h-2 rounded-full" style="width: 15%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Other</span>
+                                <span class="font-medium">25%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-gray-500 h-2 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 p-4 bg-green-50 rounded-lg">
+                        <p class="text-sm font-medium text-green-800">🎯 Your Impact</p>
+                        <p class="text-xs text-green-700 mt-1">You've reported 5 hazards this month, helping 500+ citizens avoid delays!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- User Interface Section -->
+    <section id="user-interface" class="py-12 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">Report a Traffic Violation</h2>
+                <p class="mt-4 max-w-2xl text-xl text-black-500 mx-auto">
+                    Upload photos of traffic violations from GPS MAP CAMERA app only.
+                </p>
+            </div>
+            <div class="mt-8 mx-auto max-w-3xl">
+                <form id="violation-report-form" class="space-y-6" novalidate>
+                    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                        <div class="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-black-900">Violation Details</h3>
+                            <p class="mt-1 max-w-2xl text-sm text-black-100">Provide all available legal details about the violation.</p>
+                        </div>
+                        <div class="px-4 py-5 sm:p-6">
+                            <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                <div class="sm:col-span-3">
+                                    <label for="violation-type" class="block text-sm font-medium text-gray-700">Violation Type *</label>
+                                    <select id="violation-type" name="violation-type" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <option value="">Select a violation type</option>
+                                        <option value="signal-jumping">Signal Jumping</option>
+                                        <option value="wrong-route">Driving on Wrong Route</option>
+                                        <option value="no-helmet">No Helmet</option>
+                                        <option value="over-speeding">Over Speeding</option>
+                                        <option value="wrong-parking">Wrong Parking</option>
+                                        <option value="triple-riding">Triple Riding (Two-Wheeler)</option>
+                                        <option value="no-seatbelt">No Seatbelt</option>
+                                        <option value="mobile-while-driving">Using Mobile While Driving</option>
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="vehicle-number" class="block text-sm font-medium text-gray-700">Vehicle Number *</label>
+                                    <input type="text" id="vehicle-number" name="vehicle-number" required pattern="[A-Za-z]{2}[0-9]{2}[A-Za-z]{1,2}[0-9]{4}" title="Enter a valid vehicle number (e.g., TS15AB1234)" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="violation-date" class="block text-sm font-medium text-gray-700">Date of Violation *</label>
+                                    <input type="datetime-local" id="violation-date" name="violation-date" required class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="violation-location" class="block text-sm font-medium text-gray-700">Location *</label>
+                                    <div class="location-input-container">
+                                        <i class="fas fa-map-marker-alt location-icon"></i>
+                                        <input type="text" id="violation-location" name="violation-location" required placeholder="Enter violation location" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                    </div>
+                                </div>
+                                <div class="sm:col-span-6">
+                                    <label for="additional-details" class="block text-sm font-medium text-gray-700">Additional Details</label>
+                                    <textarea id="additional-details" name="additional-details" rows="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"></textarea>
+                                </div>
+                                <div class="sm:col-span-6">
+                                    <label class="block text-sm font-medium text-gray-700">Upload Evidence *</label>
+                                    <div class="text-center mt-4 p-6 bg-blue-50 rounded-lg">
+                                        <i class="fas fa-camera text-4xl text-blue-600 mb-3"></i>
+                                        <h3 class="text-lg font-medium text-gray-900 mb-2">Photo Evidence</h3>
+                                        <p class="text-gray-600 mb-4">Upload clear photos of the violation showing the vehicle number.</p>
+                                        <div class="drag-container" id="drag-container">
+                                            <input type="file" id="evidence-files" name="evidence-files" accept="image/*" multiple class="hidden">
+                                            <label for="evidence-files" class="cursor-pointer">
+                                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
+                                                <p class="text-gray-600">Click to browse or drag and drop</p>
+                                                <p class="text-sm text-gray-500 mt-2">Maximum 5 images, 10MB each</p>
+                                            </label>
+                                        </div>
+                                        <p class="mt-3 text-sm text-gray-500">Photos should clearly show the violation and vehicle number</p>
+                                    </div>
+                                    <div id="file-preview" class="photo-gallery"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                        <div class="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">Your Information</h3>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Provide your contact details for verification and commission payout.</p>
+                        </div>
+                        <div class="px-4 py-5 sm:p-6">
+                            <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                <div class="sm:col-span-3">
+                                    <label for="reporter-name" class="block text-sm font-medium text-gray-700">Your Name *</label>
+                                    <input type="text" id="reporter-name" name="reporter-name" required class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="reporter-phone" class="block text-sm font-medium text-gray-700">Phone Number *</label>
+                                    <input type="tel" id="reporter-phone" name="reporter-phone" required pattern="[0-9]{10}" title="Enter a 10-digit phone number" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="reporter-email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                                    <input type="email" id="reporter-email" name="reporter-email" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="reporter-upi" class="block text-sm font-medium text-gray-700">UPI ID *</label>
+                                    <input type="text" id="reporter-upi" name="reporter-upi" required placeholder="yourname@upi" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="reporter-id" class="block text-sm font-medium text-gray-700">ID Proof (Aadhaar/Driving License) *</label>
+                                    <div class="mt-1 flex">
+                                        <select id="id-proof-type" name="id-proof-type" class="w-1/3 py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                            <option value="aadhaar">Aadhaar</option>
+                                            <option value="dl">Driving License</option>
+                                        </select>
+                                        <input type="text" id="reporter-id" name="reporter-id" required class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border-gray-300 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="ID Number">
+                                    </div>
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="id-proof-file" class="block text-sm font-medium text-gray-700">Upload ID Proof *</label>
+                                    <input type="file" id="id-proof-file" name="id-proof-file" accept="image/*,.pdf" class="mt-1 block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer focus:outline-none focus:ring-transparent">
+                                    <p class="mt-2 text-sm text-gray-500">Upload clear image or PDF of your ID proof (max 2MB)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="terms" name="terms" type="checkbox" required class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="terms" class="font-medium text-gray-700">I confirm that all information provided is accurate *</label>
+                            <p class="text-gray-500">False reporting may lead to legal action against me.</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Submit Report</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+<!-- FAQ Section -->
+<section id="faqs" class="py-12 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">Frequently Asked Questions</h2>
+            <p class="mt-4 text-lg text-gray-600">Find answers to common questions about reporting traffic violations</p>
+        </div>
+        <div class="mt-8 mx-auto max-w-4xl">
+            <dl class="space-y-6 divide-y divide-gray-200">
+                <div class="pt-6">
+                    <button onclick="toggleFAQ(this)" class="faq-button w-full flex justify-between items-start text-left text-gray-400">
+                        <span class="font-medium text-gray-900">Who can report traffic violations?</span>
+                        <span class="ml-6 h-7 flex items-center">
+                            <svg class="faq-arrow transform rotate-0 h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="faq-content mt-2 pr-12 hidden">
+                        <p class="text-base text-gray-500">Any citizen above 18 years of age with valid ID proof can report traffic violations. The reporter must provide their contact information and ID proof for verification purposes. Your identity is kept confidential and only shared with authorized personnel if required by law.</p>
+                    </div>
+                </div>
+                
+                <div class="pt-6">
+                    <button onclick="toggleFAQ(this)" class="faq-button w-full flex justify-between items-start text-left text-gray-400">
+                        <span class="font-medium text-gray-900">What kind of evidence is required?</span>
+                        <span class="ml-6 h-7 flex items-center">
+                            <svg class="faq-arrow transform rotate-0 h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="faq-content mt-2 pr-12 hidden">
+                        <p class="text-base text-gray-500">Clear photos showing the violation and vehicle number are required. The photos should clearly show the violation in progress and the vehicle's registration number. Photos should be taken from a safe distance and not interfere with traffic flow. Maximum 5 images, 10MB each.</p>
+                    </div>
+                </div>
+                
+                <div class="pt-6">
+                    <button onclick="toggleFAQ(this)" class="faq-button w-full flex justify-between items-start text-left text-gray-400">
+                        <span class="font-medium text-gray-900">How much commission will I receive?</span>
+                        <span class="ml-6 h-7 flex items-center">
+                            <svg class="faq-arrow transform rotate-0 h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="faq-content mt-2 pr-12 hidden">
+                        <p class="text-base text-gray-500">You will receive 25% of the fine amount as commission. For example, if a ₹500 fine is issued, you'll receive ₹150. The commission is paid only after the violator pays the fine, typically within 7-10 working days via your provided UPI ID.</p>
+                    </div>
+                </div>
+                
+                <div class="pt-6">
+                    <button onclick="toggleFAQ(this)" class="faq-button w-full flex justify-between items-start text-left text-gray-400">
+                        <span class="font-medium text-gray-900">What happens after I submit a report?</span>
+                        <span class="ml-6 h-7 flex items-center">
+                            <svg class="faq-arrow transform rotate-0 h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="faq-content mt-2 pr-12 hidden">
+                        <p class="text-base text-gray-500">The police department will verify your report within 7 working days. If approved, a challan is issued to the violator. You'll receive notifications about the status of your report via SMS/Email. The entire process from submission to resolution typically takes 10-15 days.</p>
+                    </div>
+                </div>
+                
+                <div class="pt-6">
+                    <button onclick="toggleFAQ(this)" class="faq-button w-full flex justify-between items-start text-left text-gray-400">
+                        <span class="font-medium text-gray-900">What if my report is rejected?</span>
+                        <span class="ml-6 h-7 flex items-center">
+                            <svg class="faq-arrow transform rotate-0 h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="faq-content mt-2 pr-12 hidden">
+                        <p class="text-base text-gray-500">If your report doesn't meet requirements (unclear evidence, incorrect vehicle number, insufficient proof), it will be rejected. You'll receive a notification explaining the reason. You can appeal the decision within 3 days by providing additional evidence or clarification.</p>
+                    </div>
+                </div>
+                
+                <div class="pt-6">
+                    <button onclick="toggleFAQ(this)" class="faq-button w-full flex justify-between items-start text-left text-gray-400">
+                        <span class="font-medium text-gray-900">How will the violator pay the fine?</span>
+                        <span class="ml-6 h-7 flex items-center">
+                            <svg class="faq-arrow transform rotate-0 h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="faq-content mt-2 pr-12 hidden">
+                        <p class="text-base text-gray-500">Violators receive an SMS/Email with a payment link to pay online via UPI, credit/debit card, or net banking. They can also pay at designated traffic police stations or citizen service centers within 60 days. Non-payment leads to additional penalties.</p>
+                    </div>
+                </div>
+            </dl>
+        </div>
+        
+        <!-- Additional Help Section -->
+        <div class="mt-12 text-center">
+            <div class="bg-blue-50 rounded-lg p-8 max-w-3xl mx-auto">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Still have questions?</h3>
+                <p class="text-gray-600 mb-6">Our support team is here to help you with any queries about reporting traffic violations.</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="tel:1800-123-4567" class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        <i class="fas fa-phone mr-2"></i> Call Helpline
+                    </a>
+                    <a href="mailto:support@traffic.gov.in" class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-envelope mr-2"></i> Email Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function toggleFAQ(button) {
+    // Get the content div
+    const content = button.nextElementSibling;
+    const arrow = button.querySelector('.faq-arrow');
+    
+    // Check if this FAQ is already open
+    const isOpen = !content.classList.contains('hidden');
+    
+    // Close ALL FAQs first
+    document.querySelectorAll('.faq-content').forEach(item => {
+        item.classList.add('hidden');
+    });
+    document.querySelectorAll('.faq-arrow').forEach(item => {
+        item.style.transform = 'rotate(0deg)';
+    });
+    
+    // If this FAQ was closed, open it
+    if (!isOpen) {
+        content.classList.remove('hidden');
+        arrow.style.transform = 'rotate(180deg)';
+    }
+}
+
+// Alternative: Add event listeners as backup
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.faq-button').forEach(button => {
+        if (!button.hasAttribute('onclick')) {
+            button.addEventListener('click', function() {
+                toggleFAQ(this);
+            });
+        }
+    });
+});
+</script>
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Traffic Violation Portal</h3>
+                    <p class="text-gray-300">A citizen-centric initiative to promote road safety and traffic rule compliance.</p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Quick Links</h3>
+                    <ul class="space-y-2">
+                        <li><a href="#user-interface" class="text-gray-300 hover:text-white">Report Violation</a></li>
+                        <li><a href="#" onclick="toggleHazardMap()" class="text-gray-300 hover:text-white">Hazard Map</a></li>
+                        <li><a href="#" id="footer-police-login-btn" class="text-gray-300 hover:text-white">Police Login</a></li>
+                        <li><a href="#faqs" class="text-gray-300 hover:text-white">FAQs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Contact Us</h3>
+                    <address class="not-italic">
+                        Traffic Police Headquarters<br>
+                        central traffic management<br>
+                        Email: traffic.management@police.gov.in<br>
+                        Helpline: 1800-1700-1600
+                    </address>
+                </div>
+            </div>
+            <div class="mt-8 pt-8 border-t border-gray-700 text-center text-gray-400">
+                <p>© 2025 Traffic Police Department. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Hazard Reporting Modal -->
+    <div id="hazard-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">Report Hazard</h3>
+                    <button onclick="closeHazardModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="hazard-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Hazard Type</label>
+                        <select id="hazard-type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            <option value="pothole">Pothole</option>
+                            <option value="accident">Accident</option>
+                            <option value="waterlogging">Waterlogging</option>
+                            <option value="debris">Road Debris</option>
+                            <option value="streetlight">Street Light Issue</option>
+                            <option value="tree">Fallen Tree</option>
+                            <option value="animal">Animal on Road</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Severity</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setSeverity('low')" class="severity-btn px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Low</button>
+                            <button type="button" onclick="setSeverity('medium')" class="severity-btn px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Medium</button>
+                            <button type="button" onclick="setSeverity('high')" class="severity-btn px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">High</button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                        <div class="relative">
+                            <input type="text" id="hazard-location" placeholder="Enter location or use current location" class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="getCurrentLocation()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 hover:text-blue-700">
+                                <i class="fas fa-location-arrow"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="hazard-description" rows="3" placeholder="Describe the hazard in detail..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Upload Photo (Optional)</label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 cursor-pointer" onclick="document.getElementById('hazard-photo').click()">
+                            <i class="fas fa-camera text-gray-400 text-2xl mb-2"></i>
+                            <p class="text-sm text-gray-600">Click to upload photo</p>
+                            <input type="file" id="hazard-photo" accept="image/*" class="hidden">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="anonymous-report" class="mr-2">
+                        <label for="anonymous-report" class="text-sm text-gray-700">Report anonymously</label>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeHazardModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Submit Report</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Police Login Modal -->
+    <div id="police-login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">Login to Access Police Dashboard</h2>
+                <p class="mt-4 max-w-2xl text-xl text-gray-500 mx-auto">
+                    Please enter your credentials to access the dashboard.
+                </p>
+            </div>
+            
+            <form id="login-form" class="space-y-6" novalidate>
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" id="username" name="username" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" name="password" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Police Dashboard Section -->
+    <section id="police-dashboard" class="py-12 bg-gray-50 hidden">
+        <div class="flex justify-center px-4 sm:px-6 lg:px-8">
+            <div class="w-full max-w-7xl">
+                <div class="text-center mb-8">
+                    <div class="flex justify-between items-center">
+                        <div class="text-left">
+                            <h2 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">Police Headquarters Dashboard</h2>
+                            <p class="mt-4 max-w-2xl text-xl text-gray-500">
+                                Verify reported violations and issue challans to violators.
+                            </p>
+                        </div>
+                        <button id="logout-btn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Logout</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Pending Violation Reports -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white shadow rounded-lg overflow-hidden dashboard-card">
+                            <div class="px-4 py-5 sm:px-6 bg-blue-900 text-white flex justify-between items-center">
+                                <h3 class="text-lg font-medium">Pending Violation Reports</h3>
+                                <div class="flex items-center space-x-2">
+                                    <label for="filter-violations" class="sr-only">Filter</label>
+                                    <select id="filter-violations" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md text-gray-900">
+                                        <option value="all">All</option>
+                                        <option value="signal-jumping">Signal Jumping</option>
+                                        <option value="wrong-route">Wrong Route</option>
+                                        <option value="no-helmet">No Helmet</option>
+                                    </select>
+                                    <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">New</span>
+                                </div>
+                            </div>
+                            <div class="divide-y divide-gray-200" id="pending-reports-container">
+                                <!-- Violation items will be dynamically added here -->
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Stats Cards -->
+                    <div class="space-y-6">
+                        <div class="bg-white shadow rounded-lg p-6 dashboard-card">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                    <i class="fas fa-car text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Total Reports</p>
+                                    <p class="text-2xl font-semibold text-gray-900" id="total-reports">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white shadow rounded-lg p-6 dashboard-card">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                    <i class="fas fa-check-circle text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Approved</p>
+                                    <p class="text-2xl font-semibold text-gray-900" id="approved-count">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white shadow rounded-lg p-6 dashboard-card">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                                    <i class="fas fa-clock text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Pending</p>
+                                    <p class="text-2xl font-semibold text-gray-900" id="pending-count">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white shadow rounded-lg p-6 dashboard-card">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-red-100 text-red-600">
+                                    <i class="fas fa-times-circle text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-500">Rejected</p>
+                                    <p class="text-2xl font-semibold text-gray-900" id="rejected-count">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Approved Violations Section -->
+                <div class="mt-8 bg-white shadow rounded-lg overflow-hidden dashboard-card">
+                    <div class="px-4 py-5 sm:px-6 bg-green-100">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-gray-900">Approved Violations</h3>
+                            <div class="flex items-center space-x-4">
+                                <select id="filter-approved" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                    <option value="all">All</option>
+                                    <option value="last7">Last 7 Days</option>
+                                    <option value="last30">Last 30 Days</option>
+                                </select>
+                                <button type="button" id="export-btn" class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                                    <i class="fas fa-download mr-1"></i> Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Violation ID</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle No</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Violation Type</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fine Amount</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="approved-reports-container">
+                                <!-- Approved reports will be dynamically added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Photo Modal for Dashboard -->
+    <div id="photo-modal" class="photo-modal">
+        <span class="photo-modal-close">&times;</span>
+        <img class="photo-modal-content" id="modal-image">
+    </div>
+
+    <!-- Floating Hazard Map Button -->
+    <button class="floating-hazard-btn" onclick="toggleHazardMap()" title="View Hazard Report">
+        <i class="fas fa-map-marked-alt"></i>
+    </button>
+
+    <!-- JavaScript -->
+    <script>
+        // Database simulation (in a real app, this would be on the server)
+        let violationsDB = [];
+        const challansDB = [];
+        let uploadedPhotos = {}; // Store uploaded photos by violation ID
+        
+        // Hazard Map Database
+        let hazards = [];
+        let currentSeverity = 'medium';
+        let mapCenter = { lat: 19.0760, lng: 72.8777 }; // Default to Mumbai
+        
+        // DOM Elements
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const violationForm = document.getElementById('violation-report-form');
+        const evidenceFilesInput = document.getElementById('evidence-files');
+        const filePreview = document.getElementById('file-preview');
+        const violationLocationInput = document.getElementById('violation-location');
+        const loginForm = document.getElementById('login-form');
+        const policeDashboard = document.getElementById('police-dashboard');
+        const policeLoginModal = document.getElementById('police-login-modal');
+        const pendingReportsContainer = document.getElementById('pending-reports-container');
+        const approvedReportsContainer = document.getElementById('approved-reports-container');
+        const totalReportsEl = document.getElementById('total-reports');
+        const approvedCountEl = document.getElementById('approved-count');
+        const pendingCountEl = document.getElementById('pending-count');
+        const rejectedCountEl = document.getElementById('rejected-count');
+        const photoModal = document.getElementById('photo-modal');
+        const modalImage = document.getElementById('modal-image');
+        
+        // Initialize with some sample data
+        function initializeSampleData() {
+            violationsDB = [
+                {
+                    _id: 'TV123450',
+                    violationType: 'wrong-parking',
+                    vehicleNumber: 'MH01AB9999',
+                    date: new Date(Date.now() - 86400000 * 2).toISOString(),
+                    location: { address: 'Main Street, City Center' },
+                    reporter: { name: 'John Doe', phone: '9876543210', upi: 'john@upi' },
+                    additionalDetails: 'Vehicle parked in no parking zone',
+                    status: 'approved',
+                    fineAmount: 500,
+                    createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+                },
+                {
+                    _id: 'TV123451',
+                    violationType: 'over-speeding',
+                    vehicleNumber: 'KA01BB8888',
+                    date: new Date(Date.now() - 86400000 * 3).toISOString(),
+                    location: { address: 'Highway 47, Near Mall' },
+                    reporter: { name: 'Jane Smith', phone: '9876543211', upi: 'jane@upi' },
+                    additionalDetails: 'Vehicle was speeding at 80 km/h in 40 km/h zone',
+                    status: 'approved',
+                    fineAmount: 1000,
+                    createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
+                },
+                {
+                    _id: 'TV123452',
+                    violationType: 'signal-jumping',
+                    vehicleNumber: 'TS08CD5678',
+                    date: new Date(Date.now() - 86400000).toISOString(),
+                    location: { address: 'Traffic Signal, MG Road' },
+                    reporter: { name: 'Rahul Kumar', phone: '9876543212', upi: 'rahul@upi' },
+                    additionalDetails: 'Vehicle jumped red light',
+                    status: 'pending',
+                    createdAt: new Date(Date.now() - 86400000).toISOString()
+                },
+                {
+                    _id: 'TV123453',
+                    violationType: 'no-helmet',
+                    vehicleNumber: 'GJ05EF1234',
+                    date: new Date(Date.now() - 86400000 * 4).toISOString(),
+                    location: { address: 'Ring Road, Near Park' },
+                    reporter: { name: 'Priya Singh', phone: '9876543213', upi: 'priya@upi' },
+                    additionalDetails: 'Rider without helmet',
+                    status: 'rejected',
+                    createdAt: new Date(Date.now() - 86400001 * 4).toISOString()
+                }
+            ];
+            
+            // Add sample photos for existing violations
+            uploadedPhotos = {
+                'TV123452': [
+                    'https://picsum.photos/seed/signal1/400/300.jpg',
+                    'https://picsum.photos/seed/signal2/400/300.jpg'
+                ],
+                'TV123453': [
+                    'https://picsum.photos/seed/helmet1/400/300.jpg'
+                ]
+            };
+            
+            // Initialize hazard map data
+            hazards = [
+                { id: 'HZ001', type: 'pothole', lat: 19.0800, lng: 72.8750, severity: 'high', reportedAt: new Date(), verified: 3 },
+                { id: 'HZ002', type: 'accident', lat: 19.0740, lng: 72.8800, severity: 'critical', reportedAt: new Date(Date.now() - 900000), verified: 5 },
+                { id: 'HZ003', type: 'waterlogging', lat: 19.0780, lng: 72.8720, severity: 'medium', reportedAt: new Date(Date.now() - 1800000), verified: 2 }
+            ];
+        }
+        
+        // Initialize sample data on page load
+        initializeSampleData();
+        
+        // Initialize hazard map
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeHazardMap();
+            updateHazardCounts();
+            startLiveUpdates();
+        });
+        
+        function initializeHazardMap() {
+            // Update map with hazards
+            updateMapDisplay();
+        }
+        
+        function updateHazardCounts() {
+            const counts = {
+                pothole: 0,
+                accident: 0,
+                waterlogging: 0,
+                debris: 0,
+                streetlight: 0,
+                tree: 0,
+                animal: 0
+            };
+            
+            hazards.forEach(hazard => {
+                if (counts.hasOwnProperty(hazard.type)) {
+                    counts[hazard.type]++;
+                }
+            });
+            
+            // Update UI counts
+            document.getElementById('pothole-count').textContent = counts.pothole;
+            document.getElementById('accident-count').textContent = counts.accident;
+            document.getElementById('water-count').textContent = counts.waterlogging;
+            document.getElementById('debris-count').textContent = counts.debris;
+            document.getElementById('light-count').textContent = counts.streetlight;
+            document.getElementById('tree-count').textContent = counts.tree;
+            document.getElementById('animal-count').textContent = counts.animal;
+        }
+        
+        function startLiveUpdates() {
+            // Simulate live updates
+            setInterval(() => {
+                // Occasionally add new hazard
+                if (Math.random() > 0.95) {
+                    const types = ['pothole', 'waterlogging', 'debris'];
+                    const newHazard = {
+                        id: 'HZ' + Date.now(),
+                        type: types[Math.floor(Math.random() * types.length)],
+                        lat: mapCenter.lat + (Math.random() - 0.5) * 0.01,
+                        lng: mapCenter.lng + (Math.random() - 0.5) * 0.01,
+                        severity: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
+                        reportedAt: new Date(),
+                        verified: 0
+                    };
+                    hazards.push(newHazard);
+                    updateHazardCounts();
+                    showNotification('New hazard reported nearby!', 'info');
+                }
+            }, 5000);
+        }
+        
+        // Toggle Hazard Map Function
+        function toggleHazardMap() {
+            const hazardMap = document.getElementById('hazard-map');
+            if (hazardMap.classList.contains('hidden')) {
+                hazardMap.classList.remove('hidden');
+                // Scroll to the hazard map
+                hazardMap.scrollIntoView({ behavior: 'smooth' });
+                showNotification('Live Safety Map opened', 'info');
+            } else {
+                hazardMap.classList.add('hidden');
+                showNotification('Live Safety Map closed', 'info');
+            }
+        }
+        
+        // Hazard Map Functions
+        function reportHazard(type) {
+            document.getElementById('hazard-type').value = type;
+            document.getElementById('hazard-modal').classList.remove('hidden');
+            showNotification(`Reporting ${type} hazard. Please provide details.`, 'info');
+        }
+        
+        function closeHazardModal() {
+            document.getElementById('hazard-modal').classList.add('hidden');
+        }
+        
+        function setSeverity(level) {
+            currentSeverity = level;
+            document.querySelectorAll('.severity-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('border-gray-300');
+            });
+            event.target.classList.remove('border-gray-300');
+            event.target.classList.add('bg-blue-600', 'text-white');
+        }
+        
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        document.getElementById('hazard-location').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                        showNotification('Location detected successfully!', 'success');
+                    },
+                    (error) => {
+                        showNotification('Unable to get location. Please enter manually.', 'error');
+                    }
+                );
+            }
+        }
+        
+        // Handle hazard form submission
+        document.getElementById('hazard-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const hazardData = {
+                id: 'HZ' + Date.now(),
+                type: document.getElementById('hazard-type').value,
+                severity: currentSeverity,
+                location: document.getElementById('hazard-location').value,
+                description: document.getElementById('hazard-description').value,
+                anonymous: document.getElementById('anonymous-report').checked,
+                reportedAt: new Date(),
+                verified: 0
+            };
+            
+            // Add to hazards array
+            hazards.push(hazardData);
+            
+            // Update UI
+            updateMapDisplay();
+            updateHazardCounts();
+            addRecentReport(hazardData);
+            
+            // Close modal and reset form
+            closeHazardModal();
+            this.reset();
+            
+            showNotification('Hazard reported successfully! Thank you for keeping roads safe.', 'success');
+        });
+        
+        function addRecentReport(hazard) {
+            const recentReports = document.getElementById('recent-reports');
+            const reportHtml = `
+                <div class="flex items-start space-x-3 p-3 bg-${getHazardColor(hazard.type)}-50 rounded-lg">
+                    <div class="w-8 h-8 bg-${getHazardColor(hazard.type)}-500 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                        <i class="fas fa-${getHazardIcon(hazard.type)} text-xs"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">${hazard.description || `${hazard.type} reported`}</p>
+                        <p class="text-xs text-gray-500">Reported just now • ${hazard.location}</p>
+                        <div class="flex items-center mt-1 text-xs text-gray-600">
+                            <i class="fas fa-user mr-1"></i>
+                            <span>${hazard.anonymous ? 'Anonymous' : 'You'}</span>
+                            <span class="mx-2">•</span>
+                            <i class="fas fa-thumbs-up mr-1"></i>
+                            <span>0 verified</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            recentReports.insertAdjacentHTML('afterbegin', reportHtml);
+            
+            // Keep only last 5 reports
+            while (recentReports.children.length > 5) {
+                recentReports.removeChild(reports.lastChild);
+            }
+        }
+        
+        function getHazardColor(type) {
+            const colors = {
+                pothole: 'red',
+                accident: 'orange',
+                waterlogging: 'blue',
+                debris: 'yellow',
+                streetlight: 'purple',
+                tree: 'green',
+                animal: 'amber'
+            };
+            return colors[type] || 'gray';
+        }
+        
+        function getHazardIcon(type) {
+            const icons = {
+                pothole: 'exclamation-triangle',
+                accident: 'car-crash',
+                waterlogging: 'water',
+                debris: 'road',
+                streetlight: 'lightbulb',
+                tree: 'tree',
+                animal: 'paw'
+            };
+            return icons[type] || 'exclamation-circle';
+        }
+        
+        function showHazardDetails(hazardId) {
+            const hazard = hazards.find(h => h.id === hazardId);
+            if (hazard) {
+                showNotification(`${hazard.type} reported at ${hazard.location}. Severity: ${hazard.severity}`, 'info');
+            }
+        }
+        
+        function refreshMap() {
+            showNotification('Refreshing map...', 'info');
+            setTimeout(() => {
+                updateMapDisplay();
+                showNotification('Map updated with latest reports!', 'success');
+            }, 1000);
+        }
+        
+        function toggleHeatmap() {
+            showNotification('Heatmap view coming soon!', 'info');
+        }
+        
+        function filterHazards(filter) {
+            showNotification(`Filtering: ${filter}`, 'info');
+            // Implement filtering logic
+        }
+        
+        function zoomIn() {
+            showNotification('Zooming in...', 'info');
+        }
+        
+        function zoomOut() {
+            showNotification('Zooming out...', 'info');
+        }
+        
+        function centerMap() {
+            showNotification('Centering to your location...', 'info');
+        }
+        
+        function updateMapDisplay() {
+            // This would integrate with a real map service like Google Maps or Mapbox
+            // For demo, we're using a simulated map
+            console.log('Map updated with', hazards.length, 'hazards');
+        }
+        
+        // Notification System
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.getElementById('notification-container').appendChild(notification);
+            
+            // Trigger animation
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+        
+        // Mobile Menu Toggle
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // Police Login Modal
+        const policeLoginBtn = document.getElementById('police-login-btn');
+        const mobilePoliceLoginBtn = document.getElementById('mobile-police-login-btn');
+        const footerPoliceLoginBtn = document.getElementById('footer-police-login-btn');
+        const modalCloseBtn = document.querySelector('.close');
+        
+        policeLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            policeLoginModal.style.display = 'block';
+        });
+        
+        mobilePoliceLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            policeLoginModal.style.display = 'block';
+        });
+        
+        footerPoliceLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            policeLoginModal.style.display = 'block';
+        });
+        
+        modalCloseBtn.addEventListener('click', () => {
+            policeLoginModal.style.display = 'none';
+        });
+        
+        window.addEventListener('click', (event) => {
+            if (event.target === policeLoginModal) {
+                policeLoginModal.style.display = 'none';
+            }
+        });
+        
+        // Photo Modal functionality
+        const photoModalClose = document.querySelector('.photo-modal-close');
+        
+        photoModalClose.addEventListener('click', () => {
+            photoModal.style.display = 'none';
+        });
+        
+        photoModal.addEventListener('click', (event) => {
+            if (event.target === photoModal) {
+                photoModal.style.display = 'none';
+            }
+        });
+        
+        // Function to open photo modal
+        function openPhotoModal(imageSrc) {
+            modalImage.src = imageSrc;
+            photoModal.style.display = 'block';
+        }
+        
+        // Drag and drop functionality
+        const dragContainer = document.getElementById('drag-container');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dragContainer.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dragContainer.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dragContainer.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dragContainer.classList.add('active');
+        }
+        
+        function unhighlight() {
+            dragContainer.classList.remove('active');
+        }
+        
+        dragContainer.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({ target: { files } });
+        }
+        
+        // File input change handler
+        evidenceFilesInput.addEventListener('change', handleFiles);
+        
+        function handleFiles(e) {
+            const files = e.target.files;
+            const maxFiles = 5;
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            
+            if (files.length > maxFiles) {
+                showNotification(`You can only upload a maximum of ${maxFiles} files`, 'error');
+                return;
+            }
+            
+            // Clear previous previews
+            filePreview.innerHTML = '';
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // Check file size
+                if (file.size > maxSize) {
+                    showNotification(`File ${file.name} exceeds the 10MB limit`, 'error');
+                    continue;
+                }
+                
+                // Check file type
+                if (!file.type.startsWith('image/')) {
+                    showNotification(`File ${file.name} is not an image`, 'error');
+                    continue;
+                }
+                
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onloadend = function() {
+                    const preview = document.createElement('div');
+                    preview.className = 'photo-item';
+                    
+                    // Get current date and time for metadata
+                    const now = new Date();
+                    const dateTimeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+                    
+                    preview.innerHTML = `
+                        <img src="${reader.result}" alt="${file.name}">
+                        <div class="photo-metadata">
+                            <span><i class="fas fa-camera"></i> ${dateTimeStr}</span>
+                            <span><i class="fas fa-map-marker-alt"></i> ${violationLocationInput.value || 'Location not specified'}</span>
+                        </div>
+                        <button type="button" class="remove-btn" data-index="${i}">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    `;
+                    
+                    // Add delete functionality
+                    preview.querySelector('.remove-btn').addEventListener('click', function() {
+                        preview.remove();
+                    });
+                    
+                    filePreview.appendChild(preview);
+                };
+            }
+            
+            if (filePreview.children.length > 0) {
+                showNotification('Evidence photos uploaded successfully!', 'success');
+            }
+        }
+        
+        // Real-time validation for vehicle number
+        document.getElementById('vehicle-number').addEventListener('input', function() {
+            const vehicleNumber = this.value;
+            const pattern = /^[A-Za-z]{2}[0-9]{2}[A-Za-z]{1,2}[0-9]{4}$/;
+            
+            if (vehicleNumber && !pattern.test(vehicleNumber)) {
+                this.setCustomValidity('Please enter a valid vehicle number (e.g., MH02AB1234)');
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+        
+        // Real-time validation for phone number
+        document.getElementById('reporter-phone').addEventListener('input', function() {
+            const phone = this.value;
+            const pattern = /^[0-9]{10}$/;
+            
+            if (phone && !pattern.test(phone)) {
+                this.setCustomValidity('Please enter a valid 10-digit phone number');
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+
+        // Update the violation form submission
+        violationForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            // Add validation checks
+            if (filePreview.children.length === 0) {
+                showNotification('Please upload at least one photo as evidence', 'error');
+                return;
+            }
+            
+            // Check if violation date is not in the future
+            const violationDate = new Date(document.getElementById('violation-date').value);
+            const now = new Date();
+            if (violationDate > now) {
+                showNotification('Violation date cannot be in the future', 'error');
+                return;
+            }
+            
+            // Check if terms are accepted
+            if (!document.getElementById('terms').checked) {
+                showNotification('Please accept the terms and conditions', 'error');
+                return;
+            }
+            
+            // Get form data
+            const formData = new FormData(violationForm);
+            
+            // Add loading state to submit button
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Submitting...';
+            
+            try {
+                showNotification('Submitting your report...', 'info');
+                
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Generate a mock report ID
+                const reportId = 'TV' + Date.now();
+                
+                // Collect uploaded photos
+                const photos = [];
+                filePreview.querySelectorAll('.photo-item img').forEach(img => {
+                    photos.push(img.src);
+                });
+                
+                // Store photos for this violation
+                uploadedPhotos[reportId] = photos;
+                
+                // Create violation object
+                const violation = {
+                    _id: reportId,
+                    violationType: formData.get('violation-type'),
+                    vehicleNumber: formData.get('vehicle-number'),
+                    date: formData.get('violation-date'),
+                    location: { address: formData.get('violation-location') },
+                    reporter: {
+                        name: formData.get('reporter-name'),
+                        phone: formData.get('reporter-phone'),
+                        email: formData.get('reporter-email'),
+                        upi: formData.get('reporter-upi'),
+                        idType: formData.get('id-proof-type'),
+                        idNumber: formData.get('reporter-id')
+                    },
+                    additionalDetails: formData.get('additional-details'),
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+                
+                // Add to violations database
+                violationsDB.push(violation);
+                
+                showNotification('Violation report submitted successfully! Your report ID: ' + reportId, 'success');
+                this.reset();
+                filePreview.innerHTML = '';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('An error occurred while submitting the report. Please try again.', 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText;
+            }
+        });
+        
+        // Update the login form
+        loginForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // Add loading state to submit button
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Logging in...';
+            
+            try {
+                showNotification('Logging in...', 'info');
+                
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Check credentials (hardcoded for demo)
+                if ((username === 'admin' && password === 'admin123') || 
+                    (username === 'police1' && password === 'password123')) {
+                    // Show success message
+                    showNotification('Welcome, ' + username + '!', 'success');
+                    
+                    // Close modal
+                    policeLoginModal.style.display = 'none';
+                    
+                    // Show dashboard
+                    policeDashboard.classList.remove('hidden');
+                    document.getElementById('user-interface').classList.add('hidden');
+                    document.getElementById('hazard-map').classList.add('hidden');
+                    document.getElementById('faqs').classList.add('hidden');
+                    document.querySelector('footer').classList.add('hidden');
+                    
+                    // Load dashboard data
+                    loadDashboardData();
+                } else {
+                    showNotification('Invalid username or password. Please try again.', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('An error occurred during login. Please try again.', 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText;
+            }
+        });
+        
+        // Logout functionality
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            policeDashboard.classList.add('hidden');
+            document.getElementById('user-interface').classList.remove('hidden');
+            document.getElementById('hazard-map').classList.add('hidden');
+            document.getElementById('faqs').classList.remove('hidden');
+            document.querySelector('footer').classList.remove('hidden');
+            showNotification('Logged out successfully', 'info');
+        });
+        
+        // Function to load dashboard data
+        async function loadDashboardData() {
+            try {
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Calculate stats from violationsDB
+                const totalReports = violationsDB.length;
+                const approvedReports = violationsDB.filter(v => v.status === 'approved').length;
+                const pendingReports = violationsDB.filter(v => v.status === 'pending').length;
+                const rejectedReports = violationsDB.filter(v => v.status === 'rejected').length;
+                
+                document.getElementById('total-reports').textContent = totalReports;
+                document.getElementById('approved-count').textContent = approvedReports;
+                document.getElementById('pending-count').textContent = pendingReports;
+                document.getElementById('rejected-count').textContent = rejectedReports;
+                
+                // Filter pending violations
+                const pendingViolations = violationsDB.filter(v => v.status === 'pending');
+                renderPendingReports(pendingViolations);
+                
+                // Filter approved violations
+                const approvedViolations = violationsDB.filter(v => v.status === 'approved');
+                renderApprovedReports(approvedViolations);
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showNotification('Failed to load dashboard data. Please try again.', 'error');
+            }
+        }
+        
+        // Function to render pending reports - UPDATED WITH PHOTOS
+        function renderPendingReports(violations) {
+            pendingReportsContainer.innerHTML = '';
+            
+            if (violations.length === 0) {
+                pendingReportsContainer.innerHTML = `
+                    <div class="px-4 py-6 text-center text-gray-500">
+                        No pending violation reports
+                    </div>
+                `;
+                return;
+            }
+            
+            violations.forEach(violation => {
+                const reportCard = document.createElement('div');
+                reportCard.className = 'px-4 py-5 sm:px-6 violation-card transition duration-300 ease-in-out';
+                
+                // Get photos for this violation
+                const photos = uploadedPhotos[violation._id] || [];
+                
+                // Create photo thumbnails HTML
+                let photosHtml = '';
+                if (photos.length > 0) {
+                    photosHtml = `
+                        <div class="evidence-gallery">
+                            ${photos.map((photo, index) => `
+                                <img src="${photo}" 
+                                     alt="Evidence ${index + 1}" 
+                                     class="evidence-thumbnail"
+                                     onclick="openPhotoModal('${photo}')"
+                                     title="Click to view full size">
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    photosHtml = '<p class="text-sm text-gray-500 mt-2">No photos uploaded</p>';
+                }
+                
+                reportCard.innerHTML = `
+                    <div class="flex flex-col md:flex-row md:justify-between">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                ${photos.length > 0 ? 
+                                    `<img src="${photos[0]}" alt="Violation image" class="h-16 w-16 rounded-md cursor-pointer" onclick="openPhotoModal('${photos[0]}')">` :
+                                    `<img src="https://picsum.photos/seed/${violation._id}/64/64.jpg" alt="Violation image" class="h-16 w-16 rounded-md">`
+                                }
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <h4 class="text-lg font-medium text-gray-900">${capitalizeFirstLetter(violation.violationType)}</h4>
+                                <p class="text-sm text-gray-500">Vehicle No: ${violation.vehicleNumber}</p>
+                                <p class="text-sm text-gray-500">Location: ${violation.location.address}</p>
+                                <p class="text-sm text-gray-500">Reported on: ${formatDateTime(violation.createdAt)}</p>
+                                <p class="text-sm text-gray-500">Reporter: ${violation.reporter.name} (${violation.reporter.phone})</p>
+                                ${photosHtml}
+                            </div>
+                        </div>
+                        <div class="mt-4 md:mt-0 flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
+                            <button type="button" class="approve-btn inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700" data-id="${violation._id}">
+                                Approve
+                            </button>
+                            <button type="button" class="reject-btn inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700" data-id="${violation._id}">
+                                Reject
+                            </button>
+                            <button type="button" class="view-details-btn inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" data-id="${violation._id}">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+                pendingReportsContainer.appendChild(reportCard);
+            });
+            
+            // Add event listeners for approve/reject buttons
+            document.querySelectorAll('.approve-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const violationId = this.getAttribute('data-id');
+                    approveViolation(violationId);
+                });
+            });
+            
+            document.querySelectorAll('.reject-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const violationId = this.getAttribute('data-id');
+                    rejectViolation(violationId);
+                });
+            });
+            
+            document.querySelectorAll('.view-details-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const violationId = this.getAttribute('data-id');
+                    viewViolationDetails(violationId);
+                });
+            });
+        }
+        
+        // Function to approve violation
+        async function approveViolation(violationId) {
+            try {
+                showNotification(`Approving violation #${violationId}...`, 'info');
+                
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update violation status in database
+                const violationIndex = violationsDB.findIndex(v => v._id === violationId);
+                if (violationIndex !== -1) {
+                    violationsDB[violationIndex].status = 'approved';
+                    
+                    // Set fine amount based on violation type
+                    const fineAmounts = {
+                        'signal-jumping': 1000,
+                        'wrong-route': 500,
+                        'no-helmet': 500,
+                        'over-speeding': 2000,
+                        'wrong-parking': 500,
+                        'triple-riding': 1000,
+                        'no-seatbelt': 500,
+                        'mobile-while-driving': 1000
+                    };
+                    
+                    violationsDB[violationIndex].fineAmount = fineAmounts[violationsDB[violationIndex].violationType] || 500;
+                }
+                
+                showNotification(`Violation #${violationId} approved successfully!`, 'success');
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to approve violation. Please try again.', 'error');
+            }
+        }
+        
+        // Function to reject violation
+        async function rejectViolation(violationId) {
+            try {
+                const rejectionReason = prompt('Please provide a reason for rejection:');
+                
+                if (!rejectionReason) {
+                    return;
+                }
+                
+                showNotification(`Rejecting violation #${violationId}...`, 'info');
+                
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update violation status in database
+                const violationIndex = violationsDB.findIndex(v => v._id === violationId);
+                if (violationIndex !== -1) {
+                    violationsDB[violationIndex].status = 'rejected';
+                    violationsDB[violationIndex].rejectionReason = rejectionReason;
+                }
+                
+                showNotification(`Violation #${violationId} rejected.`, 'info');
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to reject violation. Please try again.', 'error');
+            }
+        }
+        
+        // Function to view violation details
+        async function viewViolationDetails(violationId) {
+            try {
+                // Find violation in database
+                const violation = violationsDB.find(v => v._id === violationId);
+                
+                if (!violation) {
+                    showNotification('Violation not found', 'error');
+                    return;
+                }
+                
+                // Get photos for this violation
+                const photos = uploadedPhotos[violation._id] || [];
+                
+                // Create photos HTML for modal
+                let photosHtml = '';
+                if (photos.length > 0) {
+                    photosHtml = `
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-500 mb-2">Evidence Photos</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${photos.map((photo, index) => `
+                                    <img src="${photo}" 
+                                         alt="Evidence ${index + 1}" 
+                                         class="w-24 h-24 object-cover rounded cursor-pointer hover:opacity-80"
+                                         onclick="openPhotoModal('${photo}')"
+                                         title="Click to view full size">
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Create a modal to show details
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <div class="p-6">
+                            <div class="flex justify-between items-center pb-3">
+                                <h3 class="text-xl font-semibold text-gray-900">Violation Details</h3>
+                                <button class="modal-close text-gray-400 hover:text-gray-600">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            ${photosHtml}
+                            <div class="space-y-3">
+                                <div>
+                                    <p class="text-sm text-gray-500">Violation ID</p>
+                                    <p class="font-medium">${violation._id}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Type</p>
+                                    <p class="font-medium">${capitalizeFirstLetter(violation.violationType)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Vehicle Number</p>
+                                    <p class="font-medium">${violation.vehicleNumber}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Date & Time</p>
+                                    <p class="font-medium">${formatDateTime(violation.date)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Location</p>
+                                    <p class="font-medium">${violation.location.address}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Reporter</p>
+                                    <p class="font-medium">${violation.reporter.name}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Reporter Phone</p>
+                                    <p class="font-medium">${violation.reporter.phone}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Reporter UPI</p>
+                                    <p class="font-medium">${violation.reporter.upi}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Additional Details</p>
+                                    <p class="font-medium">${violation.additionalDetails || 'None'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Status</p>
+                                    <p class="font-medium">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            violation.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            violation.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                            'bg-red-100 text-red-800'
+                                        }">
+                                            ${violation.status.charAt(0).toUpperCase() + violation.status.slice(1)}
+                                        </span>
+                                    </p>
+                                </div>
+                                ${violation.rejectionReason ? `
+                                <div>
+                                    <p class="text-sm text-gray-500">Rejection Reason</p>
+                                    <p class="font-medium">${violation.rejectionReason}</p>
+                                </div>
+                                ` : ''}
+                            </div>
+                            <div class="mt-6 flex justify-end">
+                                <button class="modal-close px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // Add event listeners to close buttons
+                modal.querySelectorAll('.modal-close').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        modal.remove();
+                    });
+                });
+                
+                // Close modal when clicking outside
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to fetch violation details. Please try again.', 'error');
+            }
+        }
+        
+        // Function to render approved reports
+        function renderApprovedReports(challans) {
+            approvedReportsContainer.innerHTML = '';
+            
+            if (challans.length === 0) {
+                approvedReportsContainer.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No approved violations
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            challans.forEach(challan => {
+                const row = document.createElement('tr');
+                row.className = 'table-row-hover';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${challan._id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${challan.vehicleNumber}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${capitalizeFirstLetter(challan.violationType)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${challan.fineAmount}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            challan.status === 'unpaid' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                        }">
+                            ${challan.status.charAt(0).toUpperCase() + challan.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button type="button" class="text-blue-600 hover:text-blue-900">View</button>
+                    </td>
+                `;
+                approvedReportsContainer.appendChild(row);
+            });
+        }
+        
+        // Export functionality
+        document.getElementById('export-btn').addEventListener('click', async function() {
+            try {
+                showNotification('Exporting data...', 'info');
+                
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Create a mock CSV content
+                const approvedViolations = violationsDB.filter(v => v.status === 'approved');
+                let csvContent = "data:text/csv;charset=utf-8," 
+                    + "Challan ID,Vehicle Number,Violation Type,Location,Date,Fine Amount,Status,Issued At,Paid At\n";
+                
+                approvedViolations.forEach(violation => {
+                    csvContent += `${violation._id},${violation.vehicleNumber},${violation.violationType},${violation.location.address},${formatDateTime(violation.date)},${violation.fineAmount},Unpaid,${formatDateTime(violation.createdAt)},\n`;
+                });
+                
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "violations.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showNotification('Data exported successfully!', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to export data. Please try again.', 'error');
+            }
+        });
+        
+        // FAQ Accordion
+        document.querySelectorAll('.faq-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const content = button.nextElementSibling;
+                const isActive = button.classList.contains('active');
+                
+                // Close all FAQs
+                document.querySelectorAll('.faq-button').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.nextElementSibling.classList.remove('active');
+                });
+                
+                // Open clicked FAQ if it wasn't active
+                if (!isActive) {
+                    button.classList.add('active');
+                    content.classList.add('active');
+                }
+            });
+        });
+        
+        // Utility functions
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1).replace(/-/g, ' ');
+        }
+        
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+    </script>
+</body>
+</html>
