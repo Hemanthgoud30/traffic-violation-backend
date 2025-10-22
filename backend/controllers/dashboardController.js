@@ -1,107 +1,106 @@
 const Violation = require('../models/Violation');
-const Challan = require('../models/Challan');
+const Hazard = require('../models/Hazard');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard/stats
 // @access  Private
 const getDashboardStats = async (req, res) => {
   try {
-    const totalReports = await Violation.countDocuments();
-    const approvedReports = await Violation.countDocuments({ status: 'approved' });
-    const pendingReports = await Violation.countDocuments({ status: 'pending' });
-    const rejectedReports = await Violation.countDocuments({ status: 'rejected' });
-    
-    const totalFines = await Challan.aggregate([
-      { $group: { _id: null, total: { $sum: '$fineAmount' } } }
+    // Get violation statistics
+    const totalViolations = await Violation.countDocuments();
+    const pendingViolations = await Violation.countDocuments({ status: 'pending' });
+    const approvedViolations = await Violation.countDocuments({ status: 'approved' });
+    const rejectedViolations = await Violation.countDocuments({ status: 'rejected' });
+
+    // Get hazard statistics
+    const totalHazards = await Hazard.countDocuments();
+    const reportedHazards = await Hazard.countDocuments({ status: 'reported' });
+    const verifiedHazards = await Hazard.countDocuments({ status: 'verified' });
+    const resolvedHazards = await Hazard.countDocuments({ status: 'resolved' });
+
+    // Get recent violations
+    const recentViolations = await Violation.find()
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get recent hazards
+    const recentHazards = await Hazard.find()
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get monthly violation data for the past year
+    const monthlyViolations = await Violation.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 },
+      },
     ]);
-    
-    const collectedFines = await Challan.aggregate([
-      { $match: { status: 'paid' } },
-      { $group: { _id: null, total: { $sum: '$fineAmount' } } }
+
+    // Get violation type distribution
+    const violationTypes = await Violation.aggregate([
+      {
+        $group: {
+          _id: '$violationType',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Get hazard type distribution
+    const hazardTypes = await Hazard.aggregate([
+      {
+        $group: {
+          _id: '$type',
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     res.status(200).json({
       success: true,
       data: {
-        totalReports,
-        approvedReports,
-        pendingReports,
-        rejectedReports,
-        totalFines: totalFines[0]?.total || 0,
-        collectedFines: collectedFines[0]?.total || 0
-      }
+        violations: {
+          total: totalViolations,
+          pending: pendingViolations,
+          approved: approvedViolations,
+          rejected: rejectedViolations,
+          recent: recentViolations,
+          monthly: monthlyViolations,
+          types: violationTypes,
+        },
+        hazards: {
+          total: totalHazards,
+          reported: reportedHazards,
+          verified: verifiedHazards,
+          resolved: resolvedHazards,
+          recent: recentHazards,
+          types: hazardTypes,
+        },
+      },
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-// @desc    Get pending violations
-// @route   GET /api/dashboard/pending-violations
-// @access  Private
-const getPendingViolations = async (req, res) => {
-  try {
-    const violations = await Violation.find({ status: 'pending' })
-      .sort('-createdAt')
-      .limit(10);
-
-    res.status(200).json({
-      success: true,
-      count: violations.length,
-      data: violations
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
-  }
-};
-
-// @desc    Get approved violations (challans)
-// @route   GET /api/dashboard/approved-violations
-// @access  Private
-const getApprovedViolations = async (req, res) => {
-  try {
-    const challans = await Challan.find()
-      .populate('violationId', 'reporter')
-      .sort('-issuedAt');
-
-    res.status(200).json({
-      success: true,
-      count: challans.length,
-      data: challans
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
-  }
-};
-
-// @desc    Export approved violations as CSV
-// @route   GET /api/dashboard/export
-// @access  Private
-const exportViolations = async (req, res) => {
-  try {
-    const challans = await Challan.find()
-      .populate('violationId', 'reporter')
-      .sort('-issuedAt');
-
-    // Create CSV string
-    let csv = 'Challan ID,Vehicle Number,Violation Type,Location,Date,Fine Amount,Status,Issued At,Paid At\n';
-    
-    challans.forEach(challan => {
-      csv += `${challan._id},${challan.vehicleNumber},${challan.violationType},${challan.location},${challan.date.toISOString().split('T')[0]},${challan.fineAmount},${challan.status},${challan.issuedAt.toISOString().split('T')[0]},${challan.paidAt ? challan.paidAt.toISOString().split('T')[0] : ''}\n`;
-    });
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=violations.csv');
-    res.status(200).send(csv);
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
-  }
-};
-
-// Export all functions
 module.exports = {
   getDashboardStats,
-  getPendingViolations,
-  getApprovedViolations,
-  exportViolations
 };

@@ -2,17 +2,14 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Hardcode the connection string temporarily for testing
-    const uri = 'mongodb+srv://admin:1MLMsbJHJmTRrltq@cluster0.phpllut.mongodb.net/?retryWrites=true&w=majority';
-    
-    await mongoose.connect(uri, {
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    
-    console.log('MongoDB Connected...');
-  } catch (err) {
-    console.error('MongoDB Connection Error:', err.message);
+
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
     process.exit(1);
   }
 };

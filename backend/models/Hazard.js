@@ -1,48 +1,97 @@
 const mongoose = require('mongoose');
 
-const ChallanSchema = new mongoose.Schema({
-  violationId: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'Violation',
-    required: true
-  },
-  vehicleNumber: {
+const hazardSchema = new mongoose.Schema({
+  hazardId: {
     type: String,
-    required: true
+    required: true,
+    unique: true,
+    default: function() {
+      return 'HZ' + Date.now();
+    }
   },
-  violationType: {
+  type: {
     type: String,
-    required: true
+    required: [true, 'Please specify the hazard type'],
+    enum: [
+      'pothole',
+      'accident',
+      'waterlogging',
+      'debris',
+      'streetlight',
+      'tree',
+      'animal',
+      'other'
+    ]
+  },
+  severity: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium',
   },
   location: {
+    address: {
+      type: String,
+      required: [true, 'Please provide the location'],
+    },
+    coordinates: {
+      lat: {
+        type: Number,
+        required: [true, 'Please provide latitude'],
+      },
+      lng: {
+        type: Number,
+        required: [true, 'Please provide longitude'],
+      },
+    }
+  },
+  description: {
     type: String,
-    required: true
+    required: [true, 'Please provide a description'],
   },
-  date: {
-    type: Date,
-    required: true
+  photo: {
+    type: String, // URL to the uploaded photo
   },
-  fineAmount: {
-    type: Number,
-    required: true
+  reporter: {
+    name: {
+      type: String,
+    },
+    phone: {
+      type: String,
+      match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number']
+    },
+    isAnonymous: {
+      type: Boolean,
+      default: false,
+    }
   },
   status: {
     type: String,
-    enum: ['unpaid', 'paid'],
-    default: 'unpaid'
+    enum: ['reported', 'verified', 'resolved'],
+    default: 'reported',
   },
-  issuedBy: {
-    type: mongoose.Schema.ObjectId,
+  verifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
   },
-  issuedAt: {
+  verifiedAt: {
     type: Date,
-    default: Date.now
   },
-  paidAt: Date,
-  paymentMethod: String,
-  paymentId: String
+  resolvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  resolvedAt: {
+    type: Date,
+  },
+  verifiedCount: {
+    type: Number,
+    default: 0,
+  },
+  resolvedDetails: {
+    type: String,
+  }
+}, {
+  timestamps: true,
 });
 
-module.exports = mongoose.model('Challan', ChallanSchema);
+module.exports = mongoose.model('Hazard', hazardSchema);

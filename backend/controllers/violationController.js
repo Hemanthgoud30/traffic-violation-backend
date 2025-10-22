@@ -1,102 +1,104 @@
 const Violation = require('../models/Violation');
-const Challan = require('../models/Challan');
-const { sendEmail } = require('../utils/email');
 
 // @desc    Create a new violation report
 // @route   POST /api/violations
 // @access  Public
 const createViolation = async (req, res) => {
   try {
-    // Add user to req.body
-    req.body.reporter = {
-      name: req.body.reporterName,
-      phone: req.body.reporterPhone,
-      email: req.body.reporterEmail,
-      idProof: {
-        type: req.body.idProofType,
-        number: req.body.reporterId,
-        file: req.body.idProofFile
-      }
-    };
-
-    // Handle evidence files
-    if (req.files && req.files.evidence) {
-      const evidenceFiles = req.files.evidence.map(file => ({
-        filename: file.filename,
-        path: file.path,
-        originalName: file.originalname,
-        size: file.size,
-        mimetype: file.mimetype
-      }));
-      req.body.evidenceFiles = evidenceFiles;
+    // Add Cloudinary URLs to request body
+    if (req.files && req.files.evidencePhotos) {
+      req.body.evidencePhotos = req.files.evidencePhotos.map(
+        (file) => file.path // Cloudinary URL
+      );
     }
 
-    // Handle ID proof file
     if (req.files && req.files.idProof) {
-      req.body.reporter.idProof.file = {
-        filename: req.files.idProof[0].filename,
-        path: req.files.idProof[0].path,
-        originalName: req.files.idProof[0].originalname,
-        size: req.files.idProof[0].size,
-        mimetype: req.files.idProof[0].mimetype
-      };
+      req.body['reporter.idProof'] = req.files.idProof[0].path; // Cloudinary URL
     }
 
     // Create violation
     const violation = await Violation.create(req.body);
 
-    // Send confirmation email to reporter
-    if (req.body.reporterEmail) {
-      try {
-        await sendEmail({
-          email: req.body.reporterEmail,
-          subject: 'Traffic Violation Report Submitted',
-          message: `Dear ${req.body.reporterName},\n\nYour traffic violation report has been submitted successfully.\n\nReport Details:\n- Report ID: ${violation._id}\n- Vehicle Number: ${violation.vehicleNumber}\n- Violation Type: ${violation.violationType}\n- Date: ${violation.date}\n\nThank you for helping make our roads safer.\n\nTraffic Police Department`
-        });
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // Continue even if email fails
-      }
-    }
-
     res.status(201).json({
       success: true,
-      message: 'Violation report submitted successfully',
-      data: violation
+      data: violation,
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-// @desc    Get all violations
+// ... rest of the controller remains the same
+// @desc    Get all violations with filtering and pagination
 // @route   GET /api/violations
 // @access  Private
 const getViolations = async (req, res) => {
   try {
-    let query = {};
-    
-    // Filter by status if provided
-    if (req.query.status) {
-      query.status = req.query.status;
-    }
-    
-    // Filter by violation type if provided
-    if (req.query.type) {
-      query.violationType = req.query.type;
+    // Parse query parameters
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    const status = req.query.status || '';
+    const violationType = req.query.violationType || '';
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+
+    // Build query
+    const query = {};
+
+    if (status) {
+      query.status = status;
     }
 
+    if (violationType) {
+      query.violationType = violationType;
+    }
+
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = startDate;
+      if (endDate) query.date.$lte = endDate;
+    }
+
+    // Execute query
+    const total = await Violation.countDocuments(query);
     const violations = await Violation.find(query)
-      .sort('-createdAt')
-      .populate('reviewedBy', 'name');
+      .sort({ createdAt: -1 })
+      .skip(startIndex)
+      .limit(limit);
+
+    // Pagination result
+    const pagination = {};
+
+    if (startIndex + violations.length < total) {
+      pagination.next = {
+        page: page + 1,
+        limit,
+      };
+    }
+
+    if (startIndex > 0) {
+      pagination.prev = {
+        page: page - 1,
+        limit,
+      };
+    }
 
     res.status(200).json({
       success: true,
       count: violations.length,
-      data: violations
+      total,
+      pagination,
+      data: violations,
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -105,120 +107,131 @@ const getViolations = async (req, res) => {
 // @access  Private
 const getViolation = async (req, res) => {
   try {
-    const violation = await Violation.findById(req.params.id)
-      .populate('reviewedBy', 'name');
+    const violation = await Violation.findById(req.params.id);
 
     if (!violation) {
-      return res.status(404).json({ success: false, message: 'Violation not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Violation not found',
+      });
     }
 
     res.status(200).json({
       success: true,
-      data: violation
+      data: violation,
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-// @desc    Update violation status
-// @route   PUT /api/violations/:id
+// @desc    Update violation status (approve/reject)
+// @route   PUT /api/violations/:id/status
 // @access  Private
 const updateViolationStatus = async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
-    const violation = await Violation.findById(req.params.id);
+
+    // Find violation
+    let violation = await Violation.findById(req.params.id);
 
     if (!violation) {
-      return res.status(404).json({ success: false, message: 'Violation not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Violation not found',
+      });
     }
 
+    // Update fields
     violation.status = status;
     violation.reviewedBy = req.user.id;
     violation.reviewedAt = Date.now();
 
-    if (status === 'rejected') {
-      violation.rejectionReason = rejectionReason;
-    }
-
-    await violation.save();
-
-    // If approved, create a challan
     if (status === 'approved') {
-      const fineAmount = getFineAmount(violation.violationType);
-      
-      const challan = await Challan.create({
-        violationId: violation._id,
-        vehicleNumber: violation.vehicleNumber,
-        violationType: violation.violationType,
-        location: violation.location.address,
-        date: violation.date,
-        fineAmount,
-        issuedBy: req.user.id
-      });
+      // Set fine amount based on violation type
+      const fineAmounts = {
+        'signal-jumping': 1000,
+        'wrong-route': 500,
+        'no-helmet': 500,
+        'over-speeding': 2000,
+        'wrong-parking': 500,
+        'triple-riding': 1000,
+        'no-seatbelt': 500,
+        'mobile-while-driving': 1000,
+      };
 
-      // Send notification to reporter
-      if (violation.reporter.email) {
-        try {
-          await sendEmail({
-            email: violation.reporter.email,
-            subject: 'Traffic Violation Report Approved',
-            message: `Dear ${violation.reporter.name},\n\nGood news! Your traffic violation report has been approved.\n\nA challan has been issued to the vehicle owner.\n\nChallan Details:\n- Challan ID: ${challan._id}\n- Vehicle Number: ${violation.vehicleNumber}\n- Fine Amount: ₹${fineAmount}\n- Your Commission (15%): ₹${Math.round(fineAmount * 0.15)}\n\nYou will receive your commission once the fine is paid.\n\nThank you for your contribution to road safety.\n\nTraffic Police Department`
-          });
-        } catch (emailError) {
-          console.error('Email sending failed:', emailError);
-        }
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: 'Violation approved and challan created',
-        data: { violation, challan }
-      });
+      violation.fineAmount = fineAmounts[violation.violationType] || 500;
+      violation.issuedChallan = `CH${Date.now()}`;
+    } else if (status === 'rejected') {
+      violation.rejectionReason = rejectionReason || 'Insufficient evidence';
     }
 
-    // Send notification to reporter if rejected
-    if (status === 'rejected' && violation.reporter.email) {
-      try {
-        await sendEmail({
-          email: violation.reporter.email,
-          subject: 'Traffic Violation Report Rejected',
-          message: `Dear ${violation.reporter.name},\n\nWe regret to inform you that your traffic violation report has been rejected.\n\nReason: ${rejectionReason}\n\nIf you believe this is a mistake, please contact us with additional evidence.\n\nReport ID: ${violation._id}\n\nTraffic Police Department`
-        });
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-      }
-    }
+    // Save updated violation
+    violation = await violation.save();
 
     res.status(200).json({
       success: true,
-      message: `Violation ${status}`,
-      data: violation
+      data: violation,
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-// Helper function to get fine amount based on violation type
-const getFineAmount = (violationType) => {
-  const fines = {
-    'signal-jumping': 1000,
-    'wrong-route': 500,
-    'no-helmet': 500,
-    'over-speeding': 2000,
-    'wrong-parking': 500,
-    'triple-riding': 1000,
-    'no-seatbelt': 500,
-    'mobile-while-driving': 1000
-  };
-  return fines[violationType] || 500;
+// @desc    Export violations as CSV
+// @route   GET /api/violations/export
+// @access  Private
+const exportViolations = async (req, res) => {
+  try {
+    const { status, startDate, endDate } = req.query;
+
+    // Build query
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = new Date(startDate);
+      if (endDate) query.date.$lte = new Date(endDate);
+    }
+
+    // Get violations
+    const violations = await Violation.find(query).sort({ createdAt: -1 });
+
+    // Create CSV
+    let csv = 'Violation ID,Vehicle Number,Violation Type,Date,Location,Fine Amount,Status,Issued At\n';
+
+    violations.forEach((violation) => {
+      csv += `${violation.violationId},${violation.vehicleNumber},${violation.violationType},${violation.date},${violation.location.address},${violation.fineAmount || 0},${violation.status},${violation.createdAt}\n`;
+    });
+
+    // Set headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="violations.csv"');
+
+    // Send CSV
+    res.status(200).send(csv);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
-// Export all functions
 module.exports = {
   createViolation,
   getViolations,
   getViolation,
-  updateViolationStatus
+  updateViolationStatus,
+  exportViolations,
 };
